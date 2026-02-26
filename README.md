@@ -1,2 +1,14 @@
 # ytt-pos
-Native Android point-of-sale system for YTT Estate Sales featuring offline-first architecture, Star mC-Print3 receipt printing, PayPal reader integration, resale permit tax exemption handling, and real-time transaction reporting.
+
+Production-oriented Android POS scaffold using Kotlin + Jetpack Compose and a modular architecture.
+
+## Modules
+- `app`: Compose UI, Hilt application wiring, navigation
+- `domain`: pure Kotlin contracts and models
+- `data`: Room, DataStore, repositories, and WorkManager sync
+- `reporting`: reporting boundary module
+- `hardware-printer-star`: printer integration boundary
+- `hardware-cashdrawer`: cash drawer integration boundary
+- `hardware-payments`: payment integration aggregator
+  - `hardware-payments:paypal`
+  - `hardware-payments:mock`
