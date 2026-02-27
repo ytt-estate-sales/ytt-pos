@@ -2,6 +2,7 @@ package com.ytt.pos.data.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ytt.pos.domain.repository.SettingsRepository
@@ -14,17 +15,39 @@ import kotlinx.coroutines.flow.map
 class SettingsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : SettingsRepository {
-    override val storeName: Flow<String> = dataStore.data.map { prefs ->
-        prefs[STORE_NAME_KEY].orEmpty()
+    override val selectedPrinterId: Flow<String?> = dataStore.data.map { prefs ->
+        prefs[SELECTED_PRINTER_ID]
     }
 
-    override suspend fun setStoreName(name: String) {
+    override val selectedReaderId: Flow<String?> = dataStore.data.map { prefs ->
+        prefs[SELECTED_READER_ID]
+    }
+
+    override val drawerConnected: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[DRAWER_CONNECTED] ?: false
+    }
+
+    override suspend fun setSelectedPrinterId(printerId: String?) {
         dataStore.edit { prefs ->
-            prefs[STORE_NAME_KEY] = name
+            if (printerId == null) prefs.remove(SELECTED_PRINTER_ID) else prefs[SELECTED_PRINTER_ID] = printerId
+        }
+    }
+
+    override suspend fun setSelectedReaderId(readerId: String?) {
+        dataStore.edit { prefs ->
+            if (readerId == null) prefs.remove(SELECTED_READER_ID) else prefs[SELECTED_READER_ID] = readerId
+        }
+    }
+
+    override suspend fun setDrawerConnected(connected: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[DRAWER_CONNECTED] = connected
         }
     }
 
     private companion object {
-        val STORE_NAME_KEY = stringPreferencesKey("store_name")
+        val SELECTED_PRINTER_ID = stringPreferencesKey("selectedPrinterId")
+        val SELECTED_READER_ID = stringPreferencesKey("selectedReaderId")
+        val DRAWER_CONNECTED = booleanPreferencesKey("drawerConnected")
     }
 }
