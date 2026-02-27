@@ -16,10 +16,12 @@ import com.ytt.pos.data.db.ResalePermitDao
 import com.ytt.pos.data.db.SaleDao
 import com.ytt.pos.data.db.TransactionDao
 import com.ytt.pos.data.db.TransactionLineItemDao
+import com.ytt.pos.data.repository.CartRepositoryImpl
 import com.ytt.pos.data.repository.CustomerRepositoryImpl
 import com.ytt.pos.data.repository.PaymentRepositoryImpl
 import com.ytt.pos.data.repository.SalesRepositoryImpl
 import com.ytt.pos.data.repository.TransactionRepositoryImpl
+import com.ytt.pos.domain.repository.CartRepository
 import com.ytt.pos.domain.repository.CustomerRepository
 import com.ytt.pos.domain.repository.PaymentRepository
 import com.ytt.pos.domain.repository.SalesRepository
@@ -41,6 +43,9 @@ abstract class RepositoryBindingsModule {
 
     @Binds
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    abstract fun bindCartRepository(impl: CartRepositoryImpl): CartRepository
 
     @Binds
     abstract fun bindCustomerRepository(impl: CustomerRepositoryImpl): CustomerRepository
