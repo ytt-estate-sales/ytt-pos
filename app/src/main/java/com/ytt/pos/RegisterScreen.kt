@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun RegisterScreen(
     onNavigateToHardware: () -> Unit,
     onNavigateToCheckout: () -> Unit,
+    onNavigateToTransactions: () -> Unit,
     viewModel: CartViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -33,7 +34,16 @@ fun RegisterScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = "Register")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "Register")
+            Button(onClick = onNavigateToTransactions) {
+                Text(text = "Transactions")
+            }
+        }
 
         uiState.customerName?.let {
             Text(text = "Customer: $it")

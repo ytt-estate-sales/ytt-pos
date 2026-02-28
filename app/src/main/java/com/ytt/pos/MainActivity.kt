@@ -7,9 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -34,6 +36,8 @@ fun PosApp() {
                         navController.navigate("hardware")
                     }, onNavigateToCheckout = {
                         navController.navigate("checkout")
+                    }, onNavigateToTransactions = {
+                        navController.navigate("transactions")
                     })
                 }
                 composable("hardware") {
@@ -45,6 +49,20 @@ fun PosApp() {
                     CheckoutScreen(onNavigateBack = {
                         navController.popBackStack()
                     })
+                }
+                composable("transactions") {
+                    TransactionsListScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenTransaction = { transactionId ->
+                            navController.navigate("transactions/$transactionId")
+                        },
+                    )
+                }
+                composable(
+                    route = "transactions/{transactionId}",
+                    arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+                ) {
+                    TransactionDetailScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
         }
