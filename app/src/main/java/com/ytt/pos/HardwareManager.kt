@@ -1,7 +1,10 @@
 package com.ytt.pos
 
+import com.ytt.pos.domain.receipt.ReceiptContent
 import com.ytt.pos.domain.repository.SettingsRepository
 import com.ytt.pos.hardware.payments.mock.PaymentService
+import com.ytt.pos.hardware.printer.star.StarPrinterService
+import com.ytt.pos.hardware.printer.star.StarPrinterStatus
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -11,11 +14,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 
 @Singleton
 class HardwareManager @Inject constructor(
-    private val printerDelegate: FakePrinterGateway,
+    private val fakePrinterGateway: FakePrinterGateway,
+    private val starPrinterService: StarPrinterService,
     private val paymentService: PaymentService,
     private val settingsRepository: SettingsRepository,
 ) : PrinterGateway {
@@ -44,13 +49,38 @@ class HardwareManager @Inject constructor(
         initialValue = HardwareUiState(),
     )
 
-    override suspend fun printReceipt(transactionId: String): Result<Unit> =
-        printerDelegate.printReceipt(transactionId)
+    override suspend fun printReceipt(transactionId: String): Result<Unit> {
+        if (!starPrinterService.isAvailable()) {
+            return fakePrinterGateway.printReceipt(transactionId)
+        }
 
-    override suspend fun openCashDrawer(): Result<Unit> =
-        printerDelegate.openCashDrawer()
+        connectStarPrinterIfSelected()
+        val receipt = ReceiptContent(lines = listOf("TRANSACTION $transactionId"))
+        val result = starPrinterService.printReceipt(receipt)
+        printerStatusFlow.value = mapStarStatus(starPrinterService.status())
+        return result
+    }
 
-    override suspend fun status(): PrinterStatus = printerDelegate.status()
+    override suspend fun openCashDrawer(): Result<Unit> {
+        if (!starPrinterService.isAvailable()) {
+            return fakePrinterGateway.openCashDrawer()
+        }
+
+        connectStarPrinterIfSelected()
+        val result = starPrinterService.openCashDrawer()
+        printerStatusFlow.value = mapStarStatus(starPrinterService.status())
+        return result
+    }
+
+    override suspend fun status(): PrinterStatus {
+        val status = if (starPrinterService.isAvailable()) {
+            mapStarStatus(starPrinterService.status())
+        } else {
+            fakePrinterGateway.status()
+        }
+        printerStatusFlow.value = status
+        return status
+    }
 
     suspend fun setSelectedPrinterId(printerId: String?) = settingsRepository.setSelectedPrinterId(printerId)
 
@@ -59,7 +89,7 @@ class HardwareManager @Inject constructor(
     suspend fun setDrawerConnected(connected: Boolean) = settingsRepository.setDrawerConnected(connected)
 
     suspend fun reconnectAll() {
-        printerStatusFlow.value = printerDelegate.status()
+        printerStatusFlow.value = status()
         paymentService.reconnect()
         readerStatusFlow.value = paymentService.status()
     }
@@ -67,6 +97,19 @@ class HardwareManager @Inject constructor(
     suspend fun testPrint(): Result<Unit> = printReceipt("hardware-test")
 
     suspend fun testReader(): Result<Unit> = paymentService.testReader()
+
+    private suspend fun connectStarPrinterIfSelected() {
+        val selectedPrinterId = settingsRepository.selectedPrinterId.first() ?: return
+        if (starPrinterService.status() == StarPrinterStatus.Ready) return
+        starPrinterService.connect(selectedPrinterId)
+    }
+
+    private fun mapStarStatus(status: StarPrinterStatus): PrinterStatus = when (status) {
+        StarPrinterStatus.Ready -> PrinterStatus.READY
+        StarPrinterStatus.Offline -> PrinterStatus.OFFLINE
+        StarPrinterStatus.PaperOut -> PrinterStatus.ERROR
+        is StarPrinterStatus.Error -> PrinterStatus.ERROR
+    }
 }
 
 data class HardwareUiState(
