@@ -10,14 +10,39 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class RegisterHardwareViewModel @Inject constructor(
+    private val hardwareManager: HardwareManager,
+) : ViewModel() {
+    val hardwareUiState: StateFlow<HardwareUiState> = hardwareManager.uiState.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = HardwareUiState(),
+    )
+
+    fun reconnectAll() {
+        viewModelScope.launch { hardwareManager.reconnectAll() }
+    }
+}
 
 @Composable
 fun RegisterScreen(
@@ -27,6 +52,12 @@ fun RegisterScreen(
     viewModel: CartViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val hardwareViewModel: RegisterHardwareViewModel = hiltViewModel()
+    val hardwareUiState by hardwareViewModel.hardwareUiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        hardwareViewModel.reconnectAll()
+    }
 
     Column(
         modifier = Modifier
@@ -40,6 +71,24 @@ fun RegisterScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text = "Register")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            "Printer: ${if (hardwareUiState.printerStatus == PrinterStatus.READY) "Ready" else "Offline"}",
+                        )
+                    },
+                )
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            "Reader: ${if (hardwareUiState.readerStatus == ReaderStatus.READY) "Ready" else "Offline"}",
+                        )
+                    },
+                )
+            }
             Button(onClick = onNavigateToTransactions) {
                 Text(text = "Transactions")
             }

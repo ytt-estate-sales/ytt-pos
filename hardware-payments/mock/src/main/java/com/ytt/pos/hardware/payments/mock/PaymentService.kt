@@ -1,11 +1,19 @@
 package com.ytt.pos.hardware.payments.mock
 
+import com.ytt.pos.ReaderStatus
+
 interface PaymentService {
     suspend fun startCardPayment(
         totalMinor: Long,
         currency: String,
         receiptId: String,
     ): PaymentResult
+
+    suspend fun status(): ReaderStatus
+
+    suspend fun reconnect(): Result<Unit>
+
+    suspend fun testReader(): Result<Unit>
 }
 
 sealed interface PaymentResult {
@@ -24,4 +32,10 @@ class MockPaymentService @javax.inject.Inject constructor() : PaymentService {
         if (totalMinor <= 0) return PaymentResult.Failed("Invalid amount")
         return PaymentResult.Approved(providerRef = "mock-$currency-$receiptId")
     }
+
+    override suspend fun status(): ReaderStatus = ReaderStatus.READY
+
+    override suspend fun reconnect(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun testReader(): Result<Unit> = Result.success(Unit)
 }

@@ -1,7 +1,7 @@
 package com.ytt.pos.di
 
-import com.ytt.pos.FakePrinterGateway
 import com.ytt.pos.HardcodedManagerAuthService
+import com.ytt.pos.HardwareManager
 import com.ytt.pos.ManagerAuthService
 import com.ytt.pos.AndroidNetworkMonitor
 import com.ytt.pos.NetworkMonitor
@@ -31,7 +31,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindPrinterGateway(impl: FakePrinterGateway): PrinterGateway
+    abstract fun bindPrinterGateway(impl: HardwareManager): PrinterGateway
 
     @Binds
     @Singleton
