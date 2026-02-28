@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -47,7 +48,7 @@ fun CheckoutScreen(
         if (uiState.printError == null) {
             Button(
                 onClick = viewModel::onCashClicked,
-                enabled = !uiState.isProcessing,
+                enabled = !uiState.isProcessing && !uiState.isCardPaymentInProgress,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),
@@ -56,13 +57,32 @@ fun CheckoutScreen(
             }
 
             Button(
-                onClick = {},
-                enabled = false,
+                onClick = viewModel::onCardClicked,
+                enabled = uiState.isOnline && !uiState.isProcessing && !uiState.isCardPaymentInProgress,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),
             ) {
-                Text(text = "Card (Coming soon)")
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    Text(text = "Card")
+                    if (!uiState.isOnline) {
+                        Text(
+                            text = "Requires internet",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+
+            if (uiState.isCardPaymentInProgress) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator()
+                    Text(text = "Processing card payment...")
+                }
+            }
+
+            uiState.paymentMessage?.let { message ->
+                Text(text = message)
             }
         }
 
@@ -95,12 +115,27 @@ fun CheckoutScreen(
         }
     }
 
-    if (uiState.showManagerPinDialog) {
-        ManagerPinDialog(
-            error = uiState.managerPinError,
-            onDismiss = viewModel::onManagerPinDismissed,
-            onSubmit = viewModel::onManagerPinSubmitted,
+    uiState.paymentError?.let { error ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPaymentError,
+            title = { Text(text = "Card payment failed") },
+            text = { Text(text = error) },
+            confirmButton = {
+                Button(onClick = viewModel::dismissPaymentError) {
+                    Text("OK")
+                }
+            },
         )
+    }
+
+    uiState.showManagerPinDialog.let { showDialog ->
+        if (showDialog) {
+            ManagerPinDialog(
+                error = uiState.managerPinError,
+                onDismiss = viewModel::onManagerPinDismissed,
+                onSubmit = viewModel::onManagerPinSubmitted,
+            )
+        }
     }
 }
 

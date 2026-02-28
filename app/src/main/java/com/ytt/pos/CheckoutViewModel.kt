@@ -14,6 +14,8 @@ import com.ytt.pos.domain.repository.CartRepository
 import com.ytt.pos.domain.repository.PaymentRepository
 import com.ytt.pos.domain.repository.SettingsRepository
 import com.ytt.pos.domain.repository.TransactionRepository
+import com.ytt.pos.hardware.payments.mock.PaymentResult
+import com.ytt.pos.hardware.payments.mock.PaymentService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAX_RATE = 0.0825
+private const val DEFAULT_CURRENCY = "USD"
 
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
@@ -37,6 +40,8 @@ class CheckoutViewModel @Inject constructor(
     private val printerGateway: PrinterGateway,
     private val managerAuthService: ManagerAuthService,
     private val printJobDao: PrintJobDao,
+    private val paymentService: PaymentService,
+    networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
     private val viewState = MutableStateFlow(CheckoutViewState())
@@ -44,18 +49,24 @@ class CheckoutViewModel @Inject constructor(
     val uiState: StateFlow<CheckoutUiState> = combine(
         cartRepository.observeCart(),
         settingsRepository.drawerConnected,
+        networkMonitor.isOnline,
         viewState,
-    ) { cart, drawerConnected, state ->
+    ) { cart, drawerConnected, isOnline, state ->
         val subtotal = cart.lines.sumOf { it.lineTotalMinor }
         val tax = if (cart.taxStatus == TaxStatus.EXEMPT_RESALE) 0 else (subtotal * TAX_RATE).toLong()
+        val total = subtotal + tax
         CheckoutUiState(
             subtotalMinor = subtotal,
             taxMinor = tax,
-            totalMinor = subtotal + tax,
+            totalMinor = total,
             taxStatus = cart.taxStatus,
             drawerConnected = drawerConnected,
+            isOnline = isOnline,
             isProcessing = state.isProcessing,
+            isCardPaymentInProgress = state.isCardPaymentInProgress,
             printError = state.printError,
+            paymentError = state.paymentError,
+            paymentMessage = state.paymentMessage,
             showManagerPinDialog = state.showManagerPinDialog,
             managerPinError = state.managerPinError,
             receiptPrinted = state.receiptPrinted,
@@ -72,37 +83,29 @@ class CheckoutViewModel @Inject constructor(
 
         viewModelScope.launch {
             val cart = cartRepository.observeCart().first()
-
             val subtotal = cart.lines.sumOf { it.lineTotalMinor }
             val tax = if (cart.taxStatus == TaxStatus.EXEMPT_RESALE) 0 else (subtotal * TAX_RATE).toLong()
             val total = subtotal + tax
 
             val transactionId = UUID.randomUUID().toString()
             val paymentId = UUID.randomUUID().toString()
-
+            val transaction = createPendingTransaction(
+                cart = cart,
+                transactionId = transactionId,
+                paymentId = paymentId,
+                subtotal = subtotal,
+                tax = tax,
+                total = total,
+            )
             val payment = Payment(
                 id = paymentId,
                 method = PaymentMethod.CASH,
                 amountMinor = total,
-                currency = "USD",
+                currency = DEFAULT_CURRENCY,
                 status = TransactionStatus.PENDING,
             )
-            paymentRepository.upsertPayment(payment, transactionId)
 
-            val transaction = Transaction(
-                id = transactionId,
-                createdAtEpochMs = System.currentTimeMillis(),
-                lines = cart.lines,
-                subtotalMinor = subtotal,
-                taxMinor = tax,
-                totalMinor = total,
-                taxStatus = cart.taxStatus,
-                permitSnapshot = cart.permitSnapshot,
-                customerId = cart.customerId,
-                paymentId = paymentId,
-                status = TransactionStatus.PENDING,
-                printStatus = PrintStatus.NOT_PRINTED,
-            )
+            paymentRepository.upsertPayment(payment, transactionId)
             transactionRepository.upsertTransaction(transaction)
 
             viewState.update {
@@ -110,12 +113,106 @@ class CheckoutViewModel @Inject constructor(
                     isProcessing = true,
                     transactionId = transactionId,
                     printError = null,
+                    paymentError = null,
+                    paymentMessage = null,
                     receiptPrinted = false,
                 )
             }
 
             tryPrint(transaction)
         }
+    }
+
+    fun onCardClicked() {
+        if (viewState.value.isProcessing || !uiState.value.isOnline) return
+
+        viewModelScope.launch {
+            val cart = cartRepository.observeCart().first()
+            val subtotal = cart.lines.sumOf { it.lineTotalMinor }
+            val tax = if (cart.taxStatus == TaxStatus.EXEMPT_RESALE) 0 else (subtotal * TAX_RATE).toLong()
+            val total = subtotal + tax
+            val transactionId = UUID.randomUUID().toString()
+            val paymentId = UUID.randomUUID().toString()
+
+            viewState.update {
+                it.copy(
+                    isCardPaymentInProgress = true,
+                    paymentError = null,
+                    paymentMessage = null,
+                    printError = null,
+                    receiptPrinted = false,
+                )
+            }
+
+            when (val result = paymentService.startCardPayment(total, DEFAULT_CURRENCY, transactionId)) {
+                is PaymentResult.Approved -> {
+                    val transaction = createPendingTransaction(
+                        cart = cart,
+                        transactionId = transactionId,
+                        paymentId = paymentId,
+                        subtotal = subtotal,
+                        tax = tax,
+                        total = total,
+                    )
+                    val payment = Payment(
+                        id = paymentId,
+                        method = PaymentMethod.CARD,
+                        amountMinor = total,
+                        currency = DEFAULT_CURRENCY,
+                        providerRef = result.providerRef,
+                        status = TransactionStatus.PENDING,
+                    )
+
+                    paymentRepository.upsertPayment(payment, transactionId)
+                    transactionRepository.upsertTransaction(transaction)
+
+                    viewState.update {
+                        it.copy(
+                            isCardPaymentInProgress = false,
+                            isProcessing = true,
+                            transactionId = transactionId,
+                        )
+                    }
+
+                    tryPrint(transaction)
+                }
+
+                is PaymentResult.Declined -> {
+                    viewState.update {
+                        it.copy(
+                            isCardPaymentInProgress = false,
+                            paymentError = result.reason,
+                        )
+                    }
+                }
+
+                is PaymentResult.Cancelled -> {
+                    viewState.update {
+                        it.copy(
+                            isCardPaymentInProgress = false,
+                            paymentMessage = result.message,
+                        )
+                    }
+                }
+
+                is PaymentResult.Failed -> {
+                    viewState.update {
+                        it.copy(
+                            isCardPaymentInProgress = false,
+                            paymentError = result.error,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun dismissPaymentError() {
+        viewState.update { it.copy(paymentError = null) }
+    }
+
+    fun dismissPaymentMessage() {
+        viewState.update { it.copy(paymentMessage = null) }
     }
 
     fun onRetryPrint() {
@@ -171,6 +268,28 @@ class CheckoutViewModel @Inject constructor(
             }
         }
     }
+
+    private fun createPendingTransaction(
+        cart: com.ytt.pos.domain.model.Cart,
+        transactionId: String,
+        paymentId: String,
+        subtotal: Long,
+        tax: Long,
+        total: Long,
+    ): Transaction = Transaction(
+        id = transactionId,
+        createdAtEpochMs = System.currentTimeMillis(),
+        lines = cart.lines,
+        subtotalMinor = subtotal,
+        taxMinor = tax,
+        totalMinor = total,
+        taxStatus = cart.taxStatus,
+        permitSnapshot = cart.permitSnapshot,
+        customerId = cart.customerId,
+        paymentId = paymentId,
+        status = TransactionStatus.PENDING,
+        printStatus = PrintStatus.NOT_PRINTED,
+    )
 
     private fun tryPrint(transaction: Transaction) {
         viewModelScope.launch {
@@ -229,8 +348,12 @@ data class CheckoutUiState(
     val totalMinor: Long = 0,
     val taxStatus: TaxStatus = TaxStatus.TAXABLE,
     val drawerConnected: Boolean = false,
+    val isOnline: Boolean = false,
     val isProcessing: Boolean = false,
+    val isCardPaymentInProgress: Boolean = false,
     val printError: String? = null,
+    val paymentError: String? = null,
+    val paymentMessage: String? = null,
     val showManagerPinDialog: Boolean = false,
     val managerPinError: String? = null,
     val receiptPrinted: Boolean = false,
@@ -239,7 +362,10 @@ data class CheckoutUiState(
 
 private data class CheckoutViewState(
     val isProcessing: Boolean = false,
+    val isCardPaymentInProgress: Boolean = false,
     val printError: String? = null,
+    val paymentError: String? = null,
+    val paymentMessage: String? = null,
     val showManagerPinDialog: Boolean = false,
     val managerPinError: String? = null,
     val receiptPrinted: Boolean = false,
