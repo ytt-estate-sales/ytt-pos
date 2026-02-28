@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun RegisterScreen(
     onNavigateToHardware: () -> Unit,
+    onNavigateToCheckout: () -> Unit,
     viewModel: CartViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -67,14 +68,17 @@ fun RegisterScreen(
             }
         }
 
-        Button(onClick = onNavigateToHardware, modifier = Modifier.align(Alignment.End)) {
-            Text(text = "Configure Hardware")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(onClick = onNavigateToHardware) {
+                Text(text = "Configure Hardware")
+            }
+            Button(onClick = onNavigateToCheckout) {
+                Text(text = "Checkout")
+            }
         }
     }
-}
-
-private fun formatMinor(amountMinor: Long): String {
-    val dollars = amountMinor / 100
-    val cents = (amountMinor % 100).toString().padStart(2, '0')
-    return "$$dollars.$cents"
 }
