@@ -1,5 +1,9 @@
 package com.ytt.pos.di
 
+import com.ytt.pos.FakePrinterGateway
+import com.ytt.pos.HardcodedManagerAuthService
+import com.ytt.pos.ManagerAuthService
+import com.ytt.pos.PrinterGateway
 import com.ytt.pos.domain.hardware.PaymentGateway
 import com.ytt.pos.domain.usecase.AddItemToCart
 import com.ytt.pos.domain.usecase.ApplyDiscount
@@ -20,6 +24,14 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindPaymentGateway(impl: MockPaymentGateway): PaymentGateway
+
+    @Binds
+    @Singleton
+    abstract fun bindPrinterGateway(impl: FakePrinterGateway): PrinterGateway
+
+    @Binds
+    @Singleton
+    abstract fun bindManagerAuthService(impl: HardcodedManagerAuthService): ManagerAuthService
 }
 
 @Module

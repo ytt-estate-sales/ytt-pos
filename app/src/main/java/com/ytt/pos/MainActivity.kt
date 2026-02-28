@@ -32,10 +32,17 @@ fun PosApp() {
                 composable("register") {
                     RegisterScreen(onNavigateToHardware = {
                         navController.navigate("hardware")
+                    }, onNavigateToCheckout = {
+                        navController.navigate("checkout")
                     })
                 }
                 composable("hardware") {
                     HardwareScreen(onNavigateBack = {
+                        navController.popBackStack()
+                    })
+                }
+                composable("checkout") {
+                    CheckoutScreen(onNavigateBack = {
                         navController.popBackStack()
                     })
                 }
