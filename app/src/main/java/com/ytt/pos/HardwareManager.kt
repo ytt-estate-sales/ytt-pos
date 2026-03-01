@@ -88,8 +88,29 @@ class HardwareManager @Inject constructor(
 
     suspend fun setDrawerConnected(connected: Boolean) = settingsRepository.setDrawerConnected(connected)
 
+    suspend fun connectPrinter(deviceId: String): Result<Unit> {
+        val result = if (starPrinterService.isAvailable()) {
+            starPrinterService.connect(deviceId)
+        } else {
+            Result.failure(IllegalStateException("Bluetooth printer is not available"))
+        }
+        settingsRepository.setSelectedPrinterId(deviceId)
+        printerStatusFlow.value = mapStarStatus(starPrinterService.status())
+        return result
+    }
+
     suspend fun reconnectAll() {
-        printerStatusFlow.value = status()
+        val selectedPrinterId = settingsRepository.selectedPrinterId.first()
+        if (selectedPrinterId != null) {
+            if (starPrinterService.isAvailable()) {
+                starPrinterService.connect(selectedPrinterId)
+                printerStatusFlow.value = mapStarStatus(starPrinterService.status())
+            } else {
+                printerStatusFlow.value = status()
+            }
+        } else {
+            printerStatusFlow.value = status()
+        }
         paymentService.reconnect()
         readerStatusFlow.value = paymentService.status()
     }

@@ -1,17 +1,24 @@
 package com.ytt.pos
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,12 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -34,6 +43,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class HardwareViewModel @Inject constructor(
     private val hardwareManager: HardwareManager,
+    private val bluetoothDeviceRepository: BluetoothDeviceRepository,
 ) : ViewModel() {
     val uiState: StateFlow<HardwareUiState> = hardwareManager.uiState.stateIn(
         scope = viewModelScope,
@@ -41,28 +51,53 @@ class HardwareViewModel @Inject constructor(
         initialValue = HardwareUiState(),
     )
 
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = bluetoothDeviceRepository.discoveredDevices.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
+
     fun reconnectAll() {
-        viewModelScope.launch { hardwareManager.reconnectAll() }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.reconnectAll() }
     }
 
     fun setSelectedPrinterId(printerId: String?) {
-        viewModelScope.launch { hardwareManager.setSelectedPrinterId(printerId) }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.setSelectedPrinterId(printerId) }
     }
 
     fun setSelectedReaderId(readerId: String?) {
-        viewModelScope.launch { hardwareManager.setSelectedReaderId(readerId) }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.setSelectedReaderId(readerId) }
     }
 
     fun setDrawerConnected(connected: Boolean) {
-        viewModelScope.launch { hardwareManager.setDrawerConnected(connected) }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.setDrawerConnected(connected) }
     }
 
     fun testPrint() {
-        viewModelScope.launch { hardwareManager.testPrint() }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.testPrint() }
     }
 
     fun testReader() {
-        viewModelScope.launch { hardwareManager.testReader() }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.testReader() }
+    }
+
+    fun startScan() {
+        bluetoothDeviceRepository.startScan()
+    }
+
+    fun stopScan() {
+        bluetoothDeviceRepository.stopScan()
+    }
+
+    fun selectPrinter(device: DiscoveredDevice) {
+        viewModelScope.launch(Dispatchers.IO) {
+            hardwareManager.connectPrinter(device.address)
+        }
+    }
+
+    override fun onCleared() {
+        bluetoothDeviceRepository.stopScan()
+        super.onCleared()
     }
 }
 
@@ -71,12 +106,32 @@ fun HardwareScreen(
     onNavigateBack: () -> Unit,
     viewModel: HardwareViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val permissionHelper = remember { PermissionHelper() }
     val uiState by viewModel.uiState.collectAsState()
+    val devices by viewModel.discoveredDevices.collectAsState()
     var printerIdDraft by remember(uiState.selectedPrinterId) { mutableStateOf(uiState.selectedPrinterId.orEmpty()) }
     var readerIdDraft by remember(uiState.selectedReaderId) { mutableStateOf(uiState.selectedReaderId.orEmpty()) }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            permissionMessage = null
+            viewModel.startScan()
+        } else {
+            permissionMessage = "Bluetooth scan permissions denied"
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.reconnectAll()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.stopScan() }
     }
 
     Column(
@@ -96,6 +151,40 @@ fun HardwareScreen(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Drawer connected")
             Switch(checked = uiState.drawerConnected, onCheckedChange = viewModel::setDrawerConnected)
+        }
+
+        Button(onClick = {
+            val missingPermissions = permissionHelper.missingScanPermissions(context)
+            if (missingPermissions.isEmpty()) {
+                permissionMessage = null
+                viewModel.startScan()
+            } else {
+                permissionLauncher.launch(missingPermissions.toTypedArray())
+            }
+        }) {
+            Text("Scan Printers")
+        }
+        permissionMessage?.let { Text(it) }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(items = devices, key = { it.address }) { device ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.selectPrinter(device) },
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(text = device.name)
+                        Text(text = device.address)
+                        Text(text = "RSSI: ${device.rssi?.toString() ?: "N/A"}")
+                    }
+                }
+            }
         }
 
         OutlinedTextField(

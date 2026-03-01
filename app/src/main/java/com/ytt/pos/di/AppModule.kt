@@ -4,6 +4,8 @@ import com.ytt.pos.HardcodedManagerAuthService
 import com.ytt.pos.HardwareManager
 import com.ytt.pos.ManagerAuthService
 import com.ytt.pos.AndroidNetworkMonitor
+import com.ytt.pos.AndroidBluetoothDeviceRepository
+import com.ytt.pos.BluetoothDeviceRepository
 import com.ytt.pos.NetworkMonitor
 import com.ytt.pos.PrinterGateway
 import com.ytt.pos.domain.hardware.PaymentGateway
@@ -44,6 +46,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindNetworkMonitor(impl: AndroidNetworkMonitor): NetworkMonitor
+
+    @Binds
+    @Singleton
+    abstract fun bindBluetoothDeviceRepository(impl: AndroidBluetoothDeviceRepository): BluetoothDeviceRepository
 }
 
 @Module

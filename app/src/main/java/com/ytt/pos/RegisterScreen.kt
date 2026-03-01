@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -40,7 +41,7 @@ class RegisterHardwareViewModel @Inject constructor(
     )
 
     fun reconnectAll() {
-        viewModelScope.launch { hardwareManager.reconnectAll() }
+        viewModelScope.launch(Dispatchers.IO) { hardwareManager.reconnectAll() }
     }
 }
 
@@ -76,7 +77,7 @@ fun RegisterScreen(
                     onClick = {},
                     label = {
                         Text(
-                            "Printer: ${if (hardwareUiState.printerStatus == PrinterStatus.READY) "Ready" else "Offline"}",
+                            "Printer: ${hardwareUiState.printerStatus.name}",
                         )
                     },
                 )
@@ -84,7 +85,7 @@ fun RegisterScreen(
                     onClick = {},
                     label = {
                         Text(
-                            "Reader: ${if (hardwareUiState.readerStatus == ReaderStatus.READY) "Ready" else "Offline"}",
+                            "Reader: ${hardwareUiState.readerStatus.name}",
                         )
                     },
                 )
