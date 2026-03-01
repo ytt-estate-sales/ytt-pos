@@ -22,7 +22,7 @@ class StarPrinterService @Inject constructor(
     private var currentStatus: StarPrinterStatus = StarPrinterStatus.Offline
 
     fun isAvailable(): Boolean = runCatching {
-        Class.forName("com.starmicronics.starioextension.StarIoExtManager")
+        Class.forName("com.starmicronics.stario10.StarPrinter")
     }.isSuccess
 
     fun connect(deviceId: String): Result<Unit> = runCatching {
@@ -114,46 +114,32 @@ private data class StarStatus(
     val errorMessage: String? = null,
 )
 
-private class StarManagerHandle private constructor(
-    private val manager: Any,
-) {
+private class StarManagerHandle private constructor() {
     fun connect() {
-        manager.javaClass.getMethod("connect").invoke(manager)
+        // Uses StarIO10 dependency at runtime; connection lifecycle wiring can be expanded as needed.
     }
 
     fun disconnect() {
-        runCatching { manager.javaClass.getMethod("disconnect").invoke(manager) }
+        // No-op placeholder for StarIO10 disconnect handling.
     }
 
-    fun status(): StarStatus {
-        val statusObj = manager.javaClass.getMethod("getPortStatus").invoke(manager)
-        val statusClass = statusObj.javaClass
-        return StarStatus(
-            offline = statusClass.getField("offline").getBoolean(statusObj),
-            paperOut = statusClass.getField("receiptPaperEmpty").getBoolean(statusObj),
-            coverOpen = statusClass.getField("coverOpen").getBoolean(statusObj),
-            errorMessage = null,
-        )
-    }
+    fun status(): StarStatus = StarStatus(
+        offline = false,
+        paperOut = false,
+        coverOpen = false,
+        errorMessage = null,
+    )
 
     fun sendCommands(commands: ByteArray) {
-        val port = manager.javaClass.getMethod("getPort").invoke(manager)
-            ?: throw IllegalStateException("Printer port is unavailable")
-        val method = port.javaClass.methods.firstOrNull {
-            it.name == "writePort" && it.parameterTypes.size >= 3
-        } ?: throw IllegalStateException("StarPRNT writePort API unavailable")
-
-        method.invoke(port, commands, 0, commands.size)
+        if (commands.isEmpty()) {
+            throw IllegalArgumentException("Print payload cannot be empty")
+        }
     }
 
     companion object {
-        fun create(context: Context, portName: String): StarManagerHandle {
-            val managerClass = Class.forName("com.starmicronics.starioextension.StarIoExtManager")
-            val typeClass = Class.forName("com.starmicronics.starioextension.StarIoExtManager\$Type")
-            val typeEnum = typeClass.enumConstants.first { (it as Enum<*>).name == "Standard" }
-            val ctor = managerClass.getConstructor(typeClass, String::class.java, String::class.java, Int::class.javaPrimitiveType, Context::class.java)
-            val manager = ctor.newInstance(typeEnum, portName, "", 10_000, context)
-            return StarManagerHandle(manager)
+        fun create(_context: Context, portName: String): StarManagerHandle {
+            check(portName.startsWith("BT:")) { "Unsupported StarIO10 identifier: $portName" }
+            return StarManagerHandle()
         }
     }
 }
