@@ -1,6 +1,6 @@
 package com.ytt.pos.hardware.payments.mock
 
-import com.ytt.pos.ReaderStatus
+import com.ytt.pos.domain.hardware.ReaderStatus
 
 interface PaymentService {
     suspend fun startCardPayment(

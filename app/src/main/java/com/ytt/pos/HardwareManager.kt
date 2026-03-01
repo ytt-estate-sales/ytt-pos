@@ -1,6 +1,7 @@
 package com.ytt.pos
 
 import com.ytt.pos.domain.receipt.ReceiptContent
+import com.ytt.pos.domain.hardware.ReaderStatus
 import com.ytt.pos.domain.repository.SettingsRepository
 import com.ytt.pos.hardware.payments.mock.PaymentService
 import com.ytt.pos.hardware.printer.star.StarPrinterService
