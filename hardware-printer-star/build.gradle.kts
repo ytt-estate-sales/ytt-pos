@@ -21,6 +21,9 @@ dependencies {
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
+
+    implementation(libs.star.io)
+    implementation(libs.star.io.extension)
 }
 
 kapt {

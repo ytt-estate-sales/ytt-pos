@@ -67,7 +67,8 @@ class HardwareManager @Inject constructor(
         }
 
         connectStarPrinterIfSelected()
-        val result = starPrinterService.openCashDrawer()
+        val drawerConnected = settingsRepository.drawerConnected.first()
+        val result = starPrinterService.openCashDrawer(drawerConnected = drawerConnected)
         printerStatusFlow.value = mapStarStatus(starPrinterService.status())
         return result
     }
@@ -129,6 +130,7 @@ class HardwareManager @Inject constructor(
         StarPrinterStatus.Ready -> PrinterStatus.READY
         StarPrinterStatus.Offline -> PrinterStatus.OFFLINE
         StarPrinterStatus.PaperOut -> PrinterStatus.ERROR
+        StarPrinterStatus.CoverOpen -> PrinterStatus.ERROR
         is StarPrinterStatus.Error -> PrinterStatus.ERROR
     }
 }
