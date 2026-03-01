@@ -21,9 +21,7 @@ class StarPrinterService @Inject constructor(
     private var managerHandle: StarManagerHandle? = null
     private var currentStatus: StarPrinterStatus = StarPrinterStatus.Offline
 
-    fun isAvailable(): Boolean = runCatching {
-        Class.forName("com.starmicronics.stario10.StarPrinter")
-    }.isSuccess
+    fun isAvailable(): Boolean = true
 
     fun connect(deviceId: String): Result<Unit> = runCatching {
         disconnect()
