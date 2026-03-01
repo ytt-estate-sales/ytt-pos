@@ -10,7 +10,6 @@ interface PaymentService {
     suspend fun status(): ReaderStatus
 
     suspend fun reconnect(): Result<Unit>
-
     suspend fun testReader(): Result<Unit>
 }
 
