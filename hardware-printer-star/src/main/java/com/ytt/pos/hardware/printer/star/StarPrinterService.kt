@@ -26,7 +26,7 @@ class StarPrinterService @Inject constructor(
     fun connect(deviceId: String): Result<Unit> = runCatching {
         disconnect()
         val handle = StarManagerHandle.create(
-            context = appContext,
+            appContext,
             portName = if (deviceId.startsWith("BT:")) deviceId else "BT:$deviceId",
         )
         handle.connect()
