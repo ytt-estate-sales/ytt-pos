@@ -18,7 +18,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
-    implementation("com.starmicronics:stario10:1.11.2")
+    implementation(libs.star.io10)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
