@@ -12,10 +12,6 @@ object StarReceiptCommandBuilder {
         for (i in ints) add(i.toByte())
     }
 
-    private fun ArrayList<Byte>.addBytes(ints: List<Int>) {
-        for (i in ints) add(i.toByte())
-    }
-
     fun build(receipt: ReceiptContent): ByteArray {
         val bytes = arrayListOf<Byte>()
         bytes.addAll(byteArrayOf(b(ESC), b('@'.code)).toList())
@@ -55,8 +51,8 @@ object StarReceiptCommandBuilder {
             }
         }
 
-        bytes.addBytes(listOf(0x0A, 0x0A, 0x0A))
-        bytes.addBytes(listOf(GS, 'V'.code, 0x00))
+        bytes.addBytes(0x0A, 0x0A, 0x0A)
+        bytes.addBytes(GS, 'V'.code, 0x00)
         return bytes.toByteArray()
     }
 
