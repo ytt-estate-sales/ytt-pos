@@ -12,9 +12,3 @@ enum class PrinterStatus {
     OFFLINE,
     ERROR,
 }
-
-enum class ReaderStatus {
-    READY,
-    OFFLINE,
-    ERROR,
-}
