@@ -26,7 +26,7 @@ class StarPrinterService @Inject constructor(
     fun connect(deviceId: String): Result<Unit> = runCatching {
         disconnect()
         val handle = StarManagerHandle.create(
-            _context = appContext,
+            context = appContext,
             portName = if (deviceId.startsWith("BT:")) deviceId else "BT:$deviceId",
         )
         handle.connect()
@@ -135,7 +135,7 @@ private class StarManagerHandle private constructor() {
     }
 
     companion object {
-        fun create(_context: Context, portName: String): StarManagerHandle {
+        fun create(context: Context, portName: String): StarManagerHandle {
             check(portName.startsWith("BT:")) { "Unsupported StarIO10 identifier: $portName" }
             return StarManagerHandle()
         }
