@@ -11,6 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://star-m.jp/products/s_sdk/StarIO10/Android/maven") }
     }
 }
 
